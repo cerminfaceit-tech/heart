@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Артур & Дарина</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+  :root {
+    --bg: var(--tg-theme-bg-color, #fafafa);
+    --text: var(--tg-theme-text-color, #1c1c1e);
+    --hint: var(--tg-theme-hint-color, #9a9a9e);
+    --heart: #ff4d6d;
+    --heart-dark: #e63956;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 28px;
+    user-select: none;
+    -webkit-user-select: none;
+    overflow: hidden;
+    touch-action: manipulation;
+  }
+  .counter { text-align: center; }
+  .counter .num {
+    font-size: 64px;
+    font-weight: 200;
+    letter-spacing: -2px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+  }
+  .counter .label {
+    margin-top: 6px;
+    font-size: 13px;
+    color: var(--hint);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .heart-wrap { position: relative; width: min(78vw, 340px); cursor: pointer; }
+  .heart {
+    width: 100%;
+    display: block;
+    filter: drop-shadow(0 12px 24px rgba(255, 77, 109, .28));
+    transition: transform .12s ease-out;
+  }
+  .heart.pop { transform: scale(.92); }
+  .heart text {
+    fill: #fff;
+    font-family: inherit;
+    text-anchor: middle;
+    dominant-baseline: middle;
+  }
+  .heart .name { font-size: 11px; font-weight: 600; letter-spacing: .3px; }
+  .heart .amp { font-size: 8px; font-weight: 300; opacity: .85; }
+  .float {
+    position: absolute;
+    pointer-events: none;
+    color: var(--heart);
+    font-size: 22px;
+    font-weight: 500;
+    animation: rise .9s ease-out forwards;
+  }
+  @keyframes rise {
+    from { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+    to   { opacity: 0; transform: translate(-50%, -140px) scale(1.4); }
+  }
+  .reset {
+    background: none;
+    border: none;
+    color: var(--hint);
+    font-size: 14px;
+    padding: 8px 16px;
+    cursor: pointer;
+  }
+</style>
+</head>
+<body>
+  <div class="counter">
+    <div class="num" id="count">0</div>
+    <div class="label">кликов</div>
+  </div>
+
+  <div class="heart-wrap" id="heartWrap">
+    <svg class="heart" id="heart" viewBox="0 0 100 90" aria-label="Нажми на сердце">
+      <defs>
+        <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="#ff6b85"/>
+          <stop offset="100%" stop-color="#e63956"/>
+        </linearGradient>
+      </defs>
+      <path fill="url(#g)" d="M50 88 C20 65 0 48 0 27 C0 11 12 0 27 0 C37 0 45 6 50 14 C55 6 63 0 73 0 C88 0 100 11 100 27 C100 48 80 65 50 88 Z"/>
+      <text class="name" x="50" y="30">Артур</text>
+      <text class="amp"  x="50" y="41">&amp;</text>
+      <text class="name" x="50" y="52">Дарина</text>
+    </svg>
+  </div>
+
+  <button class="reset" id="reset">Сбросить</button>
+
+<script>
+  const tg = window.Telegram && window.Telegram.WebApp;
+  const KEY = "heart_clicks";
+  const countEl = document.getElementById("count");
+  const heart = document.getElementById("heart");
+  const wrap = document.getElementById("heartWrap");
+  let count = 0;
+  let saveTimer = null;
+
+  const hasCloud = tg && tg.isVersionAtLeast && tg.isVersionAtLeast("6.9") && tg.CloudStorage;
+
+  if (tg) {
+    tg.ready();
+    tg.expand();
+    if (tg.isVersionAtLeast && tg.isVersionAtLeast("7.7") && tg.disableVerticalSwipes) tg.disableVerticalSwipes();
+  }
+
+  function render() { countEl.textContent = count; }
+
+  function save() {
+    localStorage.setItem(KEY, String(count));
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      if (hasCloud) tg.CloudStorage.setItem(KEY, String(count));
+    }, 400);
+  }
+
+  function load() {
+    count = parseInt(localStorage.getItem(KEY) || "0", 10) || 0;
+    render();
+    if (hasCloud) {
+      tg.CloudStorage.getItem(KEY, (err, value) => {
+        const cloud = parseInt(value || "0", 10) || 0;
+        if (!err && cloud > count) { count = cloud; render(); }
+      });
+    }
+  }
+
+  function spawnFloat(x, y) {
+    const el = document.createElement("div");
+    el.className = "float";
+    el.textContent = "♥";
+    el.style.left = x + "px";
+    el.style.top = y + "px";
+    wrap.appendChild(el);
+    setTimeout(() => el.remove(), 900);
+  }
+
+  wrap.addEventListener("pointerdown", (e) => {
+    count++;
+    render();
+    save();
+    heart.classList.add("pop");
+    setTimeout(() => heart.classList.remove("pop"), 110);
+    const r = wrap.getBoundingClientRect();
+    spawnFloat(e.clientX - r.left, e.clientY - r.top);
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred("light");
+  });
+
+  document.getElementById("reset").addEventListener("click", () => {
+    const doReset = (ok) => {
+      if (!ok) return;
+      count = 0;
+      render();
+      save();
+    };
+    if (tg && tg.isVersionAtLeast && tg.isVersionAtLeast("6.2")) {
+      tg.showConfirm("Сбросить счётчик?", doReset);
+    } else {
+      doReset(confirm("Сбросить счётчик?"));
+    }
+  });
+
+  load();
+</script>
+</body>
+</html>
